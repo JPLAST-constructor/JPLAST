@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конструктор труб JPLAST</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; user-select: none; }
+        #container { display: flex; height: 100vh; }
+        #left-panel {
+            width: 290px; background: #1e1e1e; color: #eee; display: flex; flex-direction: column;
+            border-right: 2px solid #f90; padding: 15px 10px; overflow-y: auto; z-index: 10;
+        }
+        .panel-section {
+            border: 1px solid #f90; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px;
+            background: rgba(255,140,0,0.05);
+        }
+        .section-title { color: #f90; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+        button, .btn {
+            background: #3a3a3a; color: #fff; border: 1px solid #555; padding: 5px 12px;
+            cursor: pointer; border-radius: 4px; margin: 2px; font-size: 13px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #505050; }
+        button.active { background: #f90; color: #000; border-color: #f90; }
+        button.green { background: #1a7a1a; }
+        button.red { background: #a02020; }
+        button.orange { background: #f90; color: #000; }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
+        .param-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+        .param-row label { min-width: 80px; color: #ccc; }
+        .specs-line { font-size: 13px; line-height: 1.6; color: #ddd; }
+        .summary-line { font-weight: bold; color: #f90; margin-top: 6px; border-top: 1px solid #f90; padding-top: 4px; }
+
+        #bottom-panel {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; background: #1e1e1e;
+            border-top: 2px solid #f90; display: flex; align-items: center; padding: 0 15px; gap: 10px;
+            z-index: 10; flex-wrap: wrap;
+        }
+        #canvas-container { flex: 1; position: relative; background: #d0dde5; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #help-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75); color: #fff; z-index: 30; padding: 60px; font-size: 17px;
+            line-height: 1.7;
+        }
+        #help-overlay button { position: absolute; top: 20px; right: 20px; background: #f90; color: #000; border: none; padding: 8px 18px; font-size: 18px; cursor: pointer; }
+        #objects-menu {
+            display: none; position: absolute; bottom: 80px; background: #2a2a2a; border: 2px solid #f90;
+            padding: 8px; border-radius: 6px; z-index: 25; min-width: 180px;
+        }
+        #objects-menu button { display: block; width: 100%; margin: 2px 0; text-align: left; background: #444; border: none; }
+        #objects-menu button:hover { background: #666; }
+
+        .connector-preview {
+            margin-top: 8px; text-align: center; min-height: 120px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .connector-preview img {
+            max-width: 100%;
+            max-height: 120px;
+            object-fit: contain;
+            background: #111;
+            border-radius: 4px;
+            border: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="left-panel">
+        <div class="panel-section">
+            <div class="section-title">Длина</div>
+            <div class="btn-row" id="length-buttons">
+                <button data-length="1">1 м</button><button data-length="2">2 м</button>
+                <button data-length="3" class="active">3 м</button><button data-length="4">4 м</button>
+                <button data-length="5">5 м</button><button data-length="6">6 м</button>
+            </div>
+        </div>
+        <div class="panel-section">
+            <div class="section-title">Диаметр</div>
+            <div class="btn-row" id="diameter-buttons">
+                <button data-diameter="315" class="active">315</button>
+                <button data-diameter="400">400</button>
+                <button data-diameter="500">500</button>
+            </div>
+        </div>
+        <div class="panel-section">
+            <div class="section-title">Крепления</div>
+            <div class="btn-row" id="connector-buttons">
+                <button data-ctype="standard" class="active">Станд</button>
+                <button data-ctype="pile">Свая</button>
+                <button data-ctype="anchor">Якорь</button>
+                <button data-ctype="wave">Волнорез</button>
+            </div>
+            <div class="connector-preview">
+                <img id="connector-preview-img" src="" alt="Выберите крепление">
+            </div>
+        </div>
+        <div class="panel-section">
+            <div class="section-title">Характеристики</div>
+            <div id="specs" class="specs-line">Выберите трубу</div>
+        </div>
+        <div class="panel-section">
+            <div class="section-title">Сводка</div>
+            <div id="summary-stats" class="summary-line"></div>
+        </div>
+        <button id="btn-add-pipe" class="green" style="width:100%; margin-top:10px; padding:8px;">Добавить трубу</button>
+        <button id="btn-show-embeds" style="width:100%; margin-top:5px; padding:6px;">Показать закладные</button>
+    </div>
+    <div id="canvas-container">
+        <canvas id="main-canvas"></canvas>
+    </div>
+</div>
+
+<div id="bottom-panel">
+    <button id="btn-objects">Объекты ▼</button>
+    <div class="param-row">
+        <label>Закладные:</label>
+        <button id="embeds-minus">−</button>
+        <span id="embeds-value" style="min-width:25px; text-align:center;">3</span>
+        <button id="embeds-plus">+</button>
+    </div>
+    <button id="btn-save">💾 Сохранить</button>
+    <button id="btn-load">📂 Загрузить</button>
+    <button id="btn-help">🛈 Памятка</button>
+    <button id="btn-delete" class="red">🗑️ Удалить</button>
+    <button id="btn-clear">🧹 Очистить</button>
+    <button id="btn-ruler">📏 Линейка</button>
+    <span style="color:#aaa; margin-left:auto; font-size:12px;">ЛКМ‑двигать | ПКМ/R‑поворот | Delete | Колёсико</span>
+</div>
+
+<div id="objects-menu">
+    <button data-obj="person">Человек (0.4×0.4)</button>
+    <button data-obj="boat1">Лодка 8м (8.0×2.5)</button>
+    <button data-obj="jetski">Гидроцикл (3.0×1.5)</button>
+    <button data-obj="kayak">Каяк (4.5×1.0)</button>
+    <button data-obj="boat2">Лодка 5м (5.0×2.0)</button>
+</div>
+
+<div id="help-overlay">
+    <button onclick="document.getElementById('help-overlay').style.display='none'">✕ Закрыть</button>
+    <h2>Инструкция</h2>
+    <ol>
+        <li>Выберите длину и диаметр трубы слева.</li>
+        <li>Нажмите «Добавить трубу» — труба появится в центре.</li>
+        <li>Перетаскивайте трубы ЛКМ, поворачивайте ПКМ или клавишей R.</li>
+        <li>Выберите тип крепления и кликните по трубе — крепление прикрепится.</li>
+        <li>Перетаскивайте крепления (кроме концевых) вдоль трубы.</li>
+        <li>Линейка: активируйте кнопку «Линейка», затем кликните две точки.</li>
+        <li>Кнопка «Объекты» открывает меню с лодками, каяком и т.д.</li>
+        <li>Закладные меняются кнопками +/−, цена обновляется автоматически.</li>
+        <li>Габариты показывают общие размеры конструкции.</li>
+    </ol>
+</div>
+
+<script>
+    // ---------- BASE64-ЗАГЛУШКИ (ЗАМЕНИТЕ НА СВОИ) ----------
+    const imgBase64Std = "data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=";
+    const imgBase64Pile = "data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=";
+    const imgBase64Anchor = "data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=";
+    const imgBase64Wave = "data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=";
+
+    const imgStd = new Image(); imgStd.src = imgBase64Std;
+    const imgPile = new Image(); imgPile.src = imgBase64Pile;
+    const imgAnchor = new Image(); imgAnchor.src = imgBase64Anchor;
+    const imgWave = new Image(); imgWave.src = imgBase64Wave;
+
+    const canvas = document.getElementById('main-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let pipes = [];
+    let blocks = [];
+    let objects = [];
+
+    let currentLength = 3;
+    let currentDiameter = 315;
+    let currentEmbeds = 3;
+    let currentConnectorType = 'standard';
+
+    let zoom = 0.08;
+    let offsetX = 0, offsetY = 0;
+    let width = canvas.clientWidth, height = canvas.clientHeight;
+    const PIXELS_PER_METER = 1000;
+
+    let rulerMode = false, rulers = [], currentRuler = [];
+    let draggingPipe = null, draggingObject = null, draggingCamera = false;
+    let dragOffsetX = 0, dragOffsetY = 0;
+    let lastMouseX = 0, lastMouseY = 0;
+    let placingConnector = false, deletingMode = false, showObjectMenu = false;
+    let showEmbeds = false;
+
+    let draggingRuler = false;
+    let draggedRulerIndex = -1, draggedPointIndex = -1, dragRulerOffset = [0,0];
+
+    let draggingConnector = null;
+
+    const PIPE_DATA = {
+        315: {1:[50,8,2,5453],2:[100,16,3,8570],3:[150,25,3,11680],4:[200,33,4,13240],5:[250,41,5,14800],6:[300,50,5,15540]},
+        400: {1:[80,11,2,7010],2:[160,22,3,11130],3:[240,33,3,15020],4:[320,44,4,17030],5:[400,55,5,19030],6:[480,66,5,19990]},
+        500: {1:[140,14,2,10900],2:[280,28,3,17140],3:[420,42,3,23370],4:[560,56,4,26490],5:[700,70,5,29600],6:[840,84,5,31160]}
+    };
+    const CONNECTOR_PRICES = { standard:3880, pile:3880, anchor:3330, wave:13000 };
+
+    function worldToScreen(wx, wy) {
+        return [(wx - offsetX) * PIXELS_PER_METER * zoom + width/2,
+                (wy - offsetY) * PIXELS_PER_METER * zoom + height/2];
+    }
+    function screenToWorld(sx, sy) {
+        return [(sx - width/2) / (PIXELS_PER_METER * zoom) + offsetX,
+                (sy - height/2) / (PIXELS_PER_METER * zoom) + offsetY];
+    }
+    function dist(p1, p2) { return Math.hypot(p2[0]-p1[0], p2[1]-p1[1]); }
+
+    function getPipeCorners(pipe) {
+        let rad = pipe.angle * Math.PI / 180;
+        let c = Math.cos(rad), s = Math.sin(rad);
+        let hx = pipe.length / 2, hy = pipe.width / 2;
+        return [
+            [pipe.x + c*hx - s*hy, pipe.y + s*hx + c*hy],
+            [pipe.x + c*hx + s*hy, pipe.y + s*hx - c*hy],
+            [pipe.x - c*hx - s*hy, pipe.y - s*hx + c*hy],
+            [pipe.x - c*hx + s*hy, pipe.y - s*hx - c*hy]
+        ];
+    }
+    function computeBBox(pipesList) {
+        if (!pipesList.length) return null;
+        let xs = [], ys = [];
+        pipesList.forEach(p => getPipeCorners(p).forEach(c => { xs.push(c[0]); ys.push(c[1]); }));
+        return {minX:Math.min(...xs), minY:Math.min(...ys), maxX:Math.max(...xs), maxY:Math.max(...ys)};
+    }
+
+    function updateConnectorPreview() {
+        const imgEl = document.getElementById('connector-preview-img');
+        if (!imgEl) return;
+        if (currentConnectorType === 'standard') imgEl.src = imgBase64Std;
+        else if (currentConnectorType === 'pile') imgEl.src = imgBase64Pile;
+        else if (currentConnectorType === 'anchor') imgEl.src = imgBase64Anchor;
+        else if (currentConnectorType === 'wave') imgEl.src = imgBase64Wave;
+    }
+
+    function updateAllSpecs() {
+        let data = PIPE_DATA[currentDiameter][currentLength];
+        let basePrice = data[3];
+        let extra = Math.max(0, currentEmbeds - data[2]) * 2500;
+        document.getElementById('specs').innerHTML = `
+            Длина: ${currentLength} м<br>
+            Диаметр: ${currentDiameter} мм<br>
+            Грузоподъёмность: ${data[0]} кг<br>
+            Вес: ${data[1]} кг<br>
+            Закладные: ${currentEmbeds} шт<br>
+            Цена трубы: ${basePrice + extra} ₽<br>
+            Крепление (${currentConnectorType}): ${CONNECTOR_PRICES[currentConnectorType]} ₽
+        `;
+        updateSummaryStats();
+    }
+
+    function updateSummaryStats() {
+        let {totalCost, totalLoad} = getTotalStats();
+        document.getElementById('summary-stats').innerHTML =
+            `Труб: ${pipes.length} | Стоимость: ${totalCost.toLocaleString()} ₽ | Нагрузка: ${totalLoad} кг`;
+    }
+
+    function getTotalStats() {
+        let totalCost = 0, totalLoad = 0;
+        pipes.forEach(p => {
+            let d = PIPE_DATA[p.diameter][p.length];
+            totalCost += d[3] + Math.max(0, p.embeds - d[2])*2500;
+            totalLoad += d[0];
+        });
+        blocks.forEach(b => totalCost += CONNECTOR_PRICES[b.ctype]);
+        return {totalCost, totalLoad};
+    }
+    updateAllSpecs();
+    updateConnectorPreview();
+
+    // ---------- Классы ----------
+    class PipeObj {
+        constructor(length, diameter, embeds, x, y, angle=0) {
+            this.length = length; this.diameter = diameter; this.width = diameter / 1000;
+            this.embeds = embeds; this.x = x; this.y = y; this.angle = angle;
+            this.connectors = [];
+            this.attached = false;
+            this.parentBlock = null;
+        }
+        draw(ctx) {
+            let [sx, sy] = worldToScreen(this.x, this.y);
+            let lenPx = this.length * PIXELS_PER_METER * zoom;
+            let wPx = this.width * PIXELS_PER_METER * zoom;
+            ctx.save(); ctx.translate(sx, sy); ctx.rotate(this.angle * Math.PI/180);
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-lenPx/2, -wPx/2, lenPx, wPx);
+            ctx.fillStyle = '#333';
+            for (let i = -lenPx/2; i < lenPx/2; i += 14) { ctx.fillRect(i, -wPx/2, 3, wPx); }
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+            ctx.strokeRect(-lenPx/2, -wPx/2, lenPx, wPx);
+            ctx.fillStyle = '#f90'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`JPLAST D${this.diameter} L${this.length}`, 0, 0);
+            if (showEmbeds) this.drawEmbeds(ctx, lenPx, wPx);
+            ctx.restore();
+            this.connectors.forEach(c => c.draw(ctx));
+        }
+        drawEmbeds(ctx, lenPx, wPx) {
+            let num = this.embeds;
+            if (num < 2) return;
+            let margin = 0.1;
+            let strokeLen = this.width * 0.3;
+            let step = (this.length - 2 * margin) / (num - 1);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+            for (let i = 0; i < num; i++) {
+                let localX = -this.length/2 + margin + i * step;
+                let center = localX * PIXELS_PER_METER * zoom;
+                let halfStroke = strokeLen * PIXELS_PER_METER * zoom / 2;
+                for (let sign = -1; sign <= 1; sign += 2) {
+                    ctx.beginPath(); ctx.moveTo(center, -halfStroke * sign); ctx.lineTo(center, halfStroke * sign); ctx.stroke();
+                }
+            }
+        }
+        containsPoint(wx, wy) {
+            let rad = -this.angle * Math.PI/180;
+            let dx = wx - this.x, dy = wy - this.y;
+            let lx = dx*Math.cos(rad) - dy*Math.sin(rad);
+            let ly = dx*Math.sin(rad) + dy*Math.cos(rad);
+            return Math.abs(lx) <= this.length/2 && Math.abs(ly) <= this.width/2;
+        }
+        rotate() { this.angle = (this.angle + 90) % 360; this.connectors.forEach(c => c.updateWorldPos()); this.updateAttachedPipes(); }
+        updateAttachedPipes() {
+            this.connectors.forEach(conn => {
+                conn.updateWorldPos();
+                pipes.forEach(p => {
+                    if (p.attached && p.parentBlock === conn) {
+                        let rad = conn.angle * Math.PI / 180;
+                        p.x = conn.worldX + Math.cos(rad) * p.length/2;
+                        p.y = conn.worldY + Math.sin(rad) * p.length/2;
+                        p.angle = conn.angle;
+                        p.connectors.forEach(c => c.updateWorldPos());
+                        p.updateAttachedPipes();
+                    }
+                });
+            });
+        }
+        // Притягивание трубы к креплению (только стандартному)
+        snapToConnectorsIfClose() {
+            let bestDist = 0.8;
+            let bestTarget = null;
+            let endpoints = this.getEndpoints();
+            for (let conn of blocks) {
+                for (let i = 0; i < endpoints.length; i++) {
+                    let ep = endpoints[i];
+                    let d = Math.hypot(ep[0] - conn.worldX, ep[1] - conn.worldY);
+                    if (d < bestDist) {
+                        let opp = endpoints[1-i];
+                        let vecX = ep[0] - opp[0], vecY = ep[1] - opp[1];
+                        let len = Math.hypot(vecX, vecY);
+                        let dirX = vecX / len, dirY = vecY / len;
+                        let newCenter = [conn.worldX - dirX * (this.length/2), conn.worldY - dirY * (this.length/2)];
+                        bestDist = d;
+                        bestTarget = { centerX: newCenter[0], centerY: newCenter[1], angle: this.angle };
+                    }
+                }
+            }
+            if (bestTarget) {
+                this.x = bestTarget.centerX;
+                this.y = bestTarget.centerY;
+            }
+        }
+        getEndpoints() {
+            let rad = this.angle * Math.PI/180;
+            let dx = this.length/2 * Math.cos(rad), dy = this.length/2 * Math.sin(rad);
+            return [[this.x - dx, this.y - dy], [this.x + dx, this.y + dy]];
+        }
+        getClosestConnectionPoint(world_x, world_y) {
+            let rad = this.angle * Math.PI / 180;
+            let ddx = world_x - this.x, ddy = world_y - this.y;
+            let localX = ddx*Math.cos(rad) + ddy*Math.sin(rad);
+            let localY = -ddx*Math.sin(rad) + ddy*Math.cos(rad);
+            localX = Math.max(-this.length/2, Math.min(this.length/2, localX));
+            let toLeft = Math.abs(localX + this.length/2);
+            let toRight = Math.abs(localX - this.length/2);
+            let toSide1 = Math.abs(localY - this.width/2);
+            let toSide2 = Math.abs(localY + this.width/2);
+            let minDist = Math.min(toLeft, toRight, toSide1, toSide2);
+            let angle_offset = 0, side = '';
+            if (minDist === toLeft) { localX = -this.length/2; localY = 0; angle_offset = 180; side = 'left'; }
+            else if (minDist === toRight) { localX = this.length/2; localY = 0; angle_offset = 0; side = 'right'; }
+            else if (minDist === toSide1) { localY = this.width/2; angle_offset = 90; side = 'top'; }
+            else { localY = -this.width/2; angle_offset = -90; side = 'bottom'; }
+            let worldX = this.x + localX*Math.cos(rad) - localY*Math.sin(rad);
+            let worldY = this.y + localX*Math.sin(rad) + localY*Math.cos(rad);
+            let normalAngle = (this.angle + angle_offset) % 360;
+            return { worldX, worldY, normalAngle, side, localX, localY };
+        }
+    }
+
+    class ConnectorBlock {
+        constructor(parentPipe, localX, localY, ctype='standard') {
+            this.parentPipe = parentPipe;
+            this.localX = localX; this.localY = localY;
+            this.ctype = ctype;
+            this.fixed = Math.abs(Math.abs(localX) - parentPipe.length/2) < 0.05;
+            // Угол больше не переопределяется в зависимости от fixed
+            this.angle = 0;
+            this.worldX = 0; this.worldY = 0;
+            this.updateWorldPos(false); // первый расчёт позиции, угол пока 0
+            // Установим правильный угол на основе стороны
+            this.setAngleFromSide();
+        }
+        setAngleFromSide() {
+            // Вычисляем угол нормали на основе localX,localY
+            let parent = this.parentPipe;
+            let rad = parent.angle * Math.PI / 180;
+            let localX = this.localX, localY = this.localY;
+            // Определяем, на какой грани
+            let toLeft = Math.abs(localX + parent.length/2);
+            let toRight = Math.abs(localX - parent.length/2);
+            let toSide1 = Math.abs(localY - parent.width/2);
+            let toSide2 = Math.abs(localY + parent.width/2);
+            let minDist = Math.min(toLeft, toRight, toSide1, toSide2);
+            let angle_offset = 0;
+            if (minDist === toLeft) angle_offset = 180;
+            else if (minDist === toRight) angle_offset = 0;
+            else if (minDist === toSide1) angle_offset = 90;
+            else angle_offset = -90;
+            this.angle = (parent.angle + angle_offset) % 360;
+        }
+        updateWorldPos(updateAngle = false) {
+            if (this.fixed) {
+                this.localX = this.localX > 0 ? this.parentPipe.length/2 : -this.parentPipe.length/2;
+            }
+            let rad = this.parentPipe.angle * Math.PI / 180;
+            let dirX = Math.cos(rad), dirY = Math.sin(rad);
+            let perpX = -Math.sin(rad), perpY = Math.cos(rad);
+            this.worldX = this.parentPipe.x + this.localX * dirX + this.localY * perpX;
+            this.worldY = this.parentPipe.y + this.localX * dirY + this.localY * perpY;
+            // Угол не меняем, он уже правильный
+        }
+        draw(ctx) {
+            this.updateWorldPos();
+            let [sx, sy] = worldToScreen(this.worldX, this.worldY);
+            let size = 0.2 * PIXELS_PER_METER * zoom;
+            let rad = this.angle * Math.PI/180;
+            let cos_a = Math.cos(rad), sin_a = Math.sin(rad);
+            let lineLen = size * 1.0;
+            let ex = sx + cos_a * lineLen, ey = sy + sin_a * lineLen;
+            let lineWidth = this.ctype==='standard' ? 4 : 2;
+            ctx.strokeStyle = '#f90'; ctx.lineWidth = lineWidth;
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+
+            if (this.ctype==='pile') {
+                let radius = size * 0.7;
+                ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(ex, ey, radius, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+            } else if (this.ctype==='anchor') {
+                let perpX = -sin_a, perpY = cos_a;
+                ctx.fillStyle = '#f90';
+                ctx.beginPath();
+                ctx.moveTo(sx - perpX*size*0.8, sy - perpY*size*0.8);
+                ctx.lineTo(sx + perpX*size*0.8, sy + perpY*size*0.8);
+                ctx.lineTo(sx + cos_a*size*0.9, sy + sin_a*size*0.9);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1.2; ctx.stroke();
+            } else if (this.ctype==='wave') {
+                let perpX = -sin_a, perpY = cos_a;
+                let w1 = size*1.5, w2 = size*1.0, h = size*1.2;
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.moveTo(sx - perpX*w1/2, sy - perpY*w1/2);
+                ctx.lineTo(sx + perpX*w1/2, sy + perpY*w1/2);
+                ctx.lineTo(sx + cos_a*h + perpX*w2/2, sy + sin_a*h + perpY*w2/2);
+                ctx.lineTo(sx + cos_a*h - perpX*w2/2, sy + sin_a*h - perpY*w2/2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+        }
+        containsPoint(wx, wy) { return Math.abs(wx-this.worldX)<0.12 && Math.abs(wy-this.worldY)<0.12; }
+    }
+
+    class PlacedObject {
+        constructor(type, x, y, angle=0) {
+            this.type = type; this.x = x; this.y = y; this.angle = angle;
+            const sizes = {person:[0.4,0.4],boat1:[8,2.5],jetski:[3,1.5],kayak:[4.5,1],boat2:[5,2]};
+            [this.width, this.height] = sizes[type];
+        }
+        draw(ctx) {
+            let [sx, sy] = worldToScreen(this.x, this.y);
+            let w = this.width * PIXELS_PER_METER * zoom, h = this.height * PIXELS_PER_METER * zoom;
+            ctx.save(); ctx.translate(sx, sy); ctx.rotate(this.angle*Math.PI/180);
+            if (this.type==='person') {
+                ctx.fillStyle = '#36c'; ctx.beginPath(); ctx.arc(0, 0, w/2, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.fillStyle = '#fe1'; ctx.beginPath(); ctx.arc(0, -h/4, w/4, 0, Math.PI*2); ctx.fill();
+            } else {
+                let col = this.type.includes('boat') ? '#8b5a2b' : (this.type==='jetski' ? '#c33' : '#3a3');
+                ctx.fillStyle = col;
+                ctx.fillRect(-w/2, -h/2, w*0.75, h);
+                ctx.beginPath(); ctx.moveTo(w*0.25, -h/2); ctx.lineTo(w/2, 0); ctx.lineTo(w*0.25, h/2); ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(-w/2, -h/2, w*0.75, h);
+            }
+            ctx.restore();
+        }
+        containsPoint(wx, wy) { return Math.abs(wx-this.x)<this.width/2 && Math.abs(wy-this.y)<this.height/2; }
+        rotate() { this.angle = (this.angle+90)%360; }
+    }
+
+    function drawGrid() {
+        let step = 0.1;
+        let startX = Math.floor((offsetX - width/2/(PIXELS_PER_METER*zoom))/step)*step;
+        let startY = Math.floor((offsetY - height/2/(PIXELS_PER_METER*zoom))/step)*step;
+        ctx.strokeStyle = '#b0b8c0'; ctx.lineWidth = 0.6;
+        for (let x = startX; x <= offsetX + width/2/(PIXELS_PER_METER*zoom); x+=step) {
+            let [sx] = worldToScreen(x,0);
+            ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, height); ctx.stroke();
+        }
+        for (let y = startY; y <= offsetY + height/2/(PIXELS_PER_METER*zoom); y+=step) {
+            let [,sy] = worldToScreen(0,y);
+            ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(width, sy); ctx.stroke();
+        }
+    }
+    function drawWatermark() {
+        ctx.fillStyle = 'rgba(255,140,0,0.3)';
+        ctx.font = 'bold 18px Arial';
+        for (let x = 0; x < width; x += 160) for (let y = 0; y < height; y += 70) ctx.fillText('JPLAST.RU', x, y);
+    }
+    function drawUI() {
+        let bbox = computeBBox(pipes);
+        if (bbox) {
+            let [sx1, sy1] = worldToScreen(bbox.minX, bbox.minY);
+            let [sx2, sy2] = worldToScreen(bbox.maxX, bbox.maxY);
+            ctx.strokeStyle = '#f90'; ctx.lineWidth = 2;
+            ctx.strokeRect(sx1, sy1, sx2-sx1, sy2-sy1);
+
+            let widthText = `Ш ${(bbox.maxX-bbox.minX).toFixed(2)} м`;
+            let heightText = `Д ${(bbox.maxY-bbox.minY).toFixed(2)} м`;
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#000';
+            ctx.fillText(widthText, sx1+5-1, sy1-5-1);
+            ctx.fillText(widthText, sx1+5+1, sy1-5-1);
+            ctx.fillText(widthText, sx1+5-1, sy1-5+1);
+            ctx.fillText(widthText, sx1+5+1, sy1-5+1);
+            ctx.fillStyle = '#f90';
+            ctx.fillText(widthText, sx1+5, sy1-5);
+            let hy = sy1 + (sy2-sy1)/2;
+            ctx.fillStyle = '#000';
+            ctx.fillText(heightText, sx2+5-1, hy-1);
+            ctx.fillText(heightText, sx2+5+1, hy-1);
+            ctx.fillText(heightText, sx2+5-1, hy+1);
+            ctx.fillText(heightText, sx2+5+1, hy+1);
+            ctx.fillStyle = '#f90';
+            ctx.fillText(heightText, sx2+5, hy);
+        }
+    }
+    function drawRulers() {
+        if (!rulerMode) return;
+        rulers.forEach(r => {
+            if (r.length===2) {
+                let [sx1,sy1] = worldToScreen(r[0][0], r[0][1]);
+                let [sx2,sy2] = worldToScreen(r[1][0], r[1][1]);
+                ctx.strokeStyle = '#f90'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(sx1,sy1); ctx.lineTo(sx2,sy2); ctx.stroke();
+                let d = dist(r[0], r[1]).toFixed(2);
+                ctx.fillStyle = '#f90'; ctx.font = 'bold 14px Arial';
+                ctx.fillText(`${d} м`, (sx1+sx2)/2+10, (sy1+sy2)/2-5);
+                ctx.fillStyle = '#f90'; ctx.beginPath(); ctx.arc(sx1,sy1,5,0,Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(sx2,sy2,5,0,Math.PI*2); ctx.fill();
+            }
+        });
+        if (currentRuler.length===1) {
+            let [sx,sy] = worldToScreen(currentRuler[0][0], currentRuler[0][1]);
+            ctx.fillStyle = '#f90'; ctx.beginPath(); ctx.arc(sx,sy,5,0,Math.PI*2); ctx.fill();
+        }
+    }
+
+    canvas.addEventListener('wheel', e => {
+        zoom *= e.deltaY < 0 ? 1.1 : 0.9;
+        zoom = Math.max(0.01, Math.min(1, zoom));
+        e.preventDefault();
+    });
+    canvas.addEventListener('mousedown', e => {
+        let [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+        if (rulerMode) {
+            for (let i=0; i<rulers.length; i++) {
+                for (let j=0; j<2; j++) {
+                    let [sx, sy] = worldToScreen(rulers[i][j][0], rulers[i][j][1]);
+                    if (Math.hypot(e.offsetX-sx, e.offsetY-sy) < 10) {
+                        draggingRuler = true; draggedRulerIndex = i; draggedPointIndex = j;
+                        dragRulerOffset = [rulers[i][j][0] - wx, rulers[i][j][1] - wy];
+                        return;
+                    }
+                }
+            }
+            currentRuler.push([wx, wy]);
+            if (currentRuler.length===2) { rulers.push([...currentRuler]); currentRuler = []; }
+            return;
+        }
+        if (deletingMode) {
+            for (let i=blocks.length-1; i>=0; i--) {
+                if (blocks[i].containsPoint(wx, wy)) {
+                    let block = blocks[i], parent = block.parentPipe;
+                    let idx = parent.connectors.indexOf(block);
+                    if (idx !== -1) parent.connectors.splice(idx, 1);
+                    blocks.splice(i, 1);
+                    deletingMode = false;
+                    document.getElementById('btn-delete').classList.remove('active');
+                    updateAllSpecs();
+                    return;
+                }
+            }
+            for (let i=pipes.length-1; i>=0; i--) {
+                if (pipes[i].containsPoint(wx, wy)) {
+                    let pipe = pipes[i];
+                    pipe.connectors.forEach(c => { let idx = blocks.indexOf(c); if (idx !== -1) blocks.splice(idx,1); });
+                    pipes.splice(i, 1);
+                    deletingMode = false;
+                    document.getElementById('btn-delete').classList.remove('active');
+                    updateAllSpecs();
+                    return;
+                }
+            }
+            for (let i=objects.length-1; i>=0; i--) {
+                if (objects[i].containsPoint(wx, wy)) {
+                    objects.splice(i, 1);
+                    deletingMode = false;
+                    document.getElementById('btn-delete').classList.remove('active');
+                    return;
+                }
+            }
+            return;
+        }
+        for (let i=blocks.length-1; i>=0; i--) if (blocks[i].containsPoint(wx, wy) && !blocks[i].fixed) { draggingConnector = blocks[i]; return; }
+        if (placingConnector) {
+            for (let p of pipes) if (p.containsPoint(wx, wy)) {
+                let pt = p.getClosestConnectionPoint(wx, wy);
+                let exists = p.connectors.some(c => Math.abs(c.localX - pt.localX) < 0.05 && Math.abs(c.localY - pt.localY) < 0.05);
+                if (!exists) {
+                    let conn = new ConnectorBlock(p, pt.localX, pt.localY, currentConnectorType);
+                    p.connectors.push(conn); blocks.push(conn);
+                }
+                updateAllSpecs();
+                return;
+            }
+        }
+        for (let i=objects.length-1; i>=0; i--) if (objects[i].containsPoint(wx, wy)) {
+            draggingObject = objects[i]; dragOffsetX = wx - objects[i].x; dragOffsetY = wy - objects[i].y;
+            lastMouseX = e.offsetX; lastMouseY = e.offsetY; return;
+        }
+        for (let i=pipes.length-1; i>=0; i--) if (pipes[i].containsPoint(wx, wy)) {
+            draggingPipe = pipes[i]; dragOffsetX = wx - pipes[i].x; dragOffsetY = wy - pipes[i].y;
+            lastMouseX = e.offsetX; lastMouseY = e.offsetY; return;
+        }
+        draggingCamera = true; lastMouseX = e.offsetX; lastMouseY = e.offsetY;
+    });
+    canvas.addEventListener('mousemove', e => {
+        let dx = e.offsetX - lastMouseX, dy = e.offsetY - lastMouseY;
+        if (draggingRuler) {
+            let [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+            rulers[draggedRulerIndex][draggedPointIndex] = [wx + dragRulerOffset[0], wy + dragRulerOffset[1]];
+            lastMouseX = e.offsetX; lastMouseY = e.offsetY; return;
+        }
+        if (draggingConnector) {
+            let parent = draggingConnector.parentPipe;
+            let rad = parent.angle * Math.PI/180;
+            let dirX = Math.cos(rad), dirY = Math.sin(rad);
+            let wx = (e.offsetX - width/2)/(PIXELS_PER_METER*zoom) + offsetX;
+            let wy = (e.offsetY - height/2)/(PIXELS_PER_METER*zoom) + offsetY;
+            let ddx = wx - parent.x, ddy = wy - parent.y;
+            let localX = ddx*dirX + ddy*dirY;
+            let localY = -ddx*dirY + ddy*dirX;
+            localX = Math.max(-parent.length/2, Math.min(parent.length/2, localX));
+            let sign = draggingConnector.localY > 0 ? 1 : -1;
+            localY = sign * parent.width/2;
+            draggingConnector.localX = localX; draggingConnector.localY = localY;
+            draggingConnector.updateWorldPos();
+            lastMouseX = e.offsetX; lastMouseY = e.offsetY; return;
+        }
+        if (draggingPipe) {
+            let [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+            draggingPipe.x = wx - dragOffsetX; draggingPipe.y = wy - dragOffsetY;
+            draggingPipe.connectors.forEach(c => c.updateWorldPos());
+            draggingPipe.updateAttachedPipes();
+        } else if (draggingObject) {
+            let [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+            draggingObject.x = wx - dragOffsetX; draggingObject.y = wy - dragOffsetY;
+        } else if (draggingCamera) {
+            offsetX -= dx/(PIXELS_PER_METER*zoom); offsetY -= dy/(PIXELS_PER_METER*zoom);
+        }
+        lastMouseX = e.offsetX; lastMouseY = e.offsetY;
+    });
+    canvas.addEventListener('mouseup', e => {
+        if (draggingPipe) {
+            draggingPipe.snapToConnectorsIfClose();
+        }
+        draggingPipe = null; draggingObject = null; draggingCamera = false; draggingRuler = false; draggingConnector = null;
+    });
+    canvas.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        let [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+        for (let p of pipes) if (p.containsPoint(wx, wy)) { p.rotate(); break; }
+        for (let o of objects) if (o.containsPoint(wx, wy)) { o.rotate(); break; }
+    });
+    window.addEventListener('keydown', e => {
+        let [wx, wy] = screenToWorld(lastMouseX, lastMouseY);
+        if (e.key === 'Delete') {
+            for (let i=blocks.length-1; i>=0; i--) if (blocks[i].containsPoint(wx, wy)) {
+                let block = blocks[i], parent = block.parentPipe;
+                let idx = parent.connectors.indexOf(block);
+                if (idx !== -1) parent.connectors.splice(idx, 1);
+                blocks.splice(i, 1); updateAllSpecs(); return;
+            }
+            for (let i=pipes.length-1; i>=0; i--) if (pipes[i].containsPoint(wx, wy)) {
+                let pipe = pipes[i];
+                pipe.connectors.forEach(c => { let idx = blocks.indexOf(c); if (idx !== -1) blocks.splice(idx,1); });
+                pipes.splice(i, 1); updateAllSpecs(); return;
+            }
+            for (let i=objects.length-1; i>=0; i--) if (objects[i].containsPoint(wx, wy)) { objects.splice(i,1); return; }
+        }
+        if (e.key === 'r' || e.key === 'R') {
+            for (let p of pipes) if (p.containsPoint(wx, wy)) { p.rotate(); break; }
+            for (let o of objects) if (o.containsPoint(wx, wy)) { o.rotate(); break; }
+        }
+    });
+
+    // --- Обработчики кнопок ---
+    document.getElementById('length-buttons').addEventListener('click', e => {
+        if (e.target.tagName==='BUTTON') {
+            document.querySelectorAll('#length-buttons button').forEach(b=>b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentLength = +e.target.dataset.length;
+            currentEmbeds = PIPE_DATA[currentDiameter][currentLength][2];
+            document.getElementById('embeds-value').textContent = currentEmbeds;
+            updateAllSpecs();
+        }
+    });
+    document.getElementById('diameter-buttons').addEventListener('click', e => {
+        if (e.target.tagName==='BUTTON') {
+            document.querySelectorAll('#diameter-buttons button').forEach(b=>b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentDiameter = +e.target.dataset.diameter;
+            currentEmbeds = PIPE_DATA[currentDiameter][currentLength][2];
+            document.getElementById('embeds-value').textContent = currentEmbeds;
+            updateAllSpecs();
+        }
+    });
+    document.getElementById('connector-buttons').addEventListener('click', e => {
+        if (e.target.tagName==='BUTTON') {
+            const btn = e.target;
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
+                placingConnector = false;
+            } else {
+                document.querySelectorAll('#connector-buttons button').forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
+                currentConnectorType = btn.dataset.ctype;
+                placingConnector = true;
+                updateConnectorPreview();
+            }
+            updateAllSpecs();
+        }
+    });
+    document.getElementById('btn-add-pipe').addEventListener('click', () => {
+        pipes.push(new PipeObj(currentLength, currentDiameter, currentEmbeds, offsetX, offsetY));
+        updateAllSpecs();
+    });
+    document.getElementById('btn-show-embeds').addEventListener('click', function() {
+        showEmbeds = !showEmbeds;
+        this.classList.toggle('active', showEmbeds);
+    });
+    document.getElementById('embeds-minus').addEventListener('click', ()=>{
+        currentEmbeds = Math.max(1, currentEmbeds-1);
+        document.getElementById('embeds-value').textContent = currentEmbeds;
+        updateAllSpecs();
+    });
+    document.getElementById('embeds-plus').addEventListener('click', ()=>{
+        currentEmbeds++;
+        document.getElementById('embeds-value').textContent = currentEmbeds;
+        updateAllSpecs();
+    });
+    document.getElementById('btn-objects').addEventListener('click', ()=>{
+        showObjectMenu = !showObjectMenu;
+        document.getElementById('objects-menu').style.display = showObjectMenu ? 'block' : 'none';
+    });
+    document.getElementById('objects-menu').addEventListener('click', e => {
+        if (e.target.tagName==='BUTTON') {
+            objects.push(new PlacedObject(e.target.dataset.obj, offsetX, offsetY));
+            showObjectMenu = false;
+            document.getElementById('objects-menu').style.display = 'none';
+        }
+    });
+    document.getElementById('btn-save').addEventListener('click', ()=>{
+        let data = {
+            pipes: pipes.map(p=>({length:p.length,diameter:p.diameter,embeds:p.embeds,x:p.x,y:p.y,angle:p.angle})),
+            blocks: blocks.map(b=>({ctype:b.ctype,localX:b.localX,localY:b.localY,fixed:b.fixed,parentIdx:pipes.indexOf(b.parentPipe)})),
+            objects: objects.map(o=>({type:o.type,x:o.x,y:o.y,angle:o.angle}))
+        };
+        let blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'scene.json'; a.click();
+    });
+    document.getElementById('btn-load').addEventListener('click', ()=>{
+        let inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+        inp.onchange = e => {
+            let file = e.target.files[0];
+            let reader = new FileReader();
+            reader.onload = ev => {
+                let data = JSON.parse(ev.target.result);
+                pipes = (data.pipes||[]).map(p=>new PipeObj(p.length,p.diameter,p.embeds,p.x,p.y,p.angle));
+                blocks = (data.blocks||[]).map(b=>{
+                    let parent = pipes[b.parentIdx];
+                    if (!parent) return null;
+                    let conn = new ConnectorBlock(parent, b.localX, b.localY, b.ctype);
+                    conn.fixed = b.fixed;
+                    parent.connectors.push(conn);
+                    return conn;
+                }).filter(b=>b);
+                objects = (data.objects||[]).map(o=>new PlacedObject(o.type,o.x,o.y,o.angle));
+                updateAllSpecs();
+            };
+            reader.readAsText(file);
+        };
+        inp.click();
+    });
+    document.getElementById('btn-help').addEventListener('click', ()=> document.getElementById('help-overlay').style.display='block');
+    document.getElementById('btn-delete').addEventListener('click', ()=>{
+        deletingMode = !deletingMode;
+        document.getElementById('btn-delete').classList.toggle('active', deletingMode);
+    });
+    document.getElementById('btn-clear').addEventListener('click', ()=>{
+        pipes = []; blocks = []; objects = [];
+        rulers = []; currentRuler = [];
+        updateAllSpecs();
+    });
+    document.getElementById('btn-ruler').addEventListener('click', ()=>{
+        rulerMode = !rulerMode;
+        if (!rulerMode) { rulers = []; currentRuler = []; }
+        document.getElementById('btn-ruler').classList.toggle('active', rulerMode);
+    });
+
+    function gameLoop() {
+        canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+        width = canvas.width; height = canvas.height;
+        ctx.clearRect(0,0,width,height);
+        ctx.fillStyle = '#d0dde5'; ctx.fillRect(0,0,width,height);
+        drawGrid();
+        drawWatermark();
+        pipes.forEach(p => p.draw(ctx));
+        objects.forEach(o => o.draw(ctx));
+        drawUI();
+        drawRulers();
+        requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+</script>
+</body>
+</html>
